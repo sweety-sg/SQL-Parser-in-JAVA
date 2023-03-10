@@ -6,10 +6,21 @@ class SQLParser {
     public HashMap<String, ArrayList<List<String>>> columns = new HashMap<>();
     public HashMap<String, List<String>> pks = new HashMap<>();
     public HashMap<String, List<String>> sks = new HashMap<>();
+    public HashMap<String, List<String>> ColumnNames = new HashMap<>();
     
     public SQLParser(String input) {
         this.input = input;
         this.position = 0;
+    }
+    public boolean parseAll(){
+        String statements[] = input.split(";");
+        boolean isValid= true;
+        for(String x: statements){
+            input = x;
+            position=0;
+            isValid = isValid && parse();
+        }
+        return isValid;
     }
     public boolean parse(){ 
         if(parseSelectStatement()) return true;
@@ -18,17 +29,64 @@ class SQLParser {
             position=0;
             match("CREATE");
             match("TABLE");
-            skipSpaces();
             int startInd = position;
             parseTableName();
             int endInd = position;
-            tables.add(input.substring(startInd,endInd));
+            tables.add(input.substring(startInd,endInd).trim());
             match("(");
-            StoreColumns(input.substring(startInd,endInd));
+            StoreColumns(input.substring(startInd,endInd).trim());
             return true;
         }
         position=0;
         if(parseInsertInto()){
+            position=0;
+            match("INSERT");
+            match("INTO");
+            int startInd = position;
+            parseTableName();
+            String tableName = input.substring(startInd,position).trim();
+            if(!tables.contains(tableName)){
+                System.out.println("There is no such table");
+                return false;
+            }
+            List<String> pk = pks.get(tableName);
+            match("(");
+            startInd = position;
+            while(position<input.length() && input.charAt(position) != ')') position++;
+            String list[] = input.substring(startInd, position).split(",");
+            for(int i=0;i< list.length;i++) list[i]= list[i].trim();
+            List<String> colList = Arrays.asList(list);
+            // System.out.println(ColumnNames);
+            for(String x: colList){
+                if(!ColumnNames.get(tableName).contains(x)){
+                    System.out.println("The column "+ x + " doesn't exist in " + tableName);
+                    return false;
+                }
+            }
+            // System.out.println(colList);
+            for(String x: pk){
+                if(!colList.contains(x)){
+                    System.out.println("Primary key " +x + " cannot be null");
+                    return false;
+                }
+            }
+            return true;
+        }
+        position=0;
+        if(parseDropTable()){
+            position=0;
+            match("DROP");
+            match("TABLE");
+            String table = input.substring(position).trim();
+            if(!tables.contains(table)){
+                System.out.print("No table named '" + table + "' in the db");
+                return false;
+            }
+            tables.remove(table);
+            columns.remove(table);
+            pks.remove(table);
+            sks.remove(table);
+            ColumnNames.remove(table);
             return true;
         }
         return false;
@@ -44,30 +102,52 @@ class SQLParser {
     private boolean parseCreateTable() {
         return match("CREATE") && match("TABLE") && parseTableName() && match("(") && parseColumnDefList() && match(")");
     }
-    private void StoreColumns(String tableName){
-        ArrayList<List<String>> cols = new ArrayList<>();
-        cols.add(findColumn());
-        while (match(",")){
-            cols.add(findColumn());
-        }
-        columns.put(tableName,cols);
+
+    private boolean parseInsertInto() {
+        return match("INSERT") && match("INTO") && parseTableName() && match("(") && parseSelectList() && match(")") && match("VALUES") && match("(") && parseValueList() && match(")");
+    }
+    private boolean parseDropTable() {
+        return match("DROP") && match("TABLE") && parseTableName();
     }
 
-    private List<String> findColumn(){
+    private void StoreColumns(String tableName){
+        ArrayList<List<String>> cols = new ArrayList<>();
+        List<String> pk= new ArrayList<>();
+        List<String> fk= new ArrayList<>();
+        List<String> colNames= new ArrayList<>();
+        cols.add(findColumn(pk,fk, colNames));
+        while (match(",")){
+            cols.add(findColumn(pk,fk, colNames));
+        }
+        columns.put(tableName,cols);
+        pks.put(tableName, pk);
+        sks.put(tableName, fk);
+        ColumnNames.put(tableName, colNames);
+    }
+
+    private List<String> findColumn(List<String> pk, List<String> fk, List<String> colNames){
         List<String> singleCol = new ArrayList<>();
         skipSpaces();
         int startInd = position;
         parseColumnName();
         int endInd = position;
-        singleCol.add(input.substring(startInd,endInd));
+        singleCol.add(input.substring(startInd,endInd).trim());
+        colNames.add(input.substring(startInd,endInd).trim());
         parseDataType();
         singleCol.add(input.substring(endInd,position));
         endInd= position;
         skipSpaces();
         parseColumnConstraints();
-        if(position-endInd<1) singleCol.add("no constraint provided");
-        else if(position-endInd <=12)singleCol.add(input.substring(endInd,position));
-        else singleCol.add(input.substring(endInd,endInd+12));
+        String temp= input.substring(endInd,position).trim();
+        if(temp.length()<1) singleCol.add("no constraint provided");
+        else if(temp.length() <12){
+            singleCol.add(temp);
+            if(temp.equals("PRIMARY KEY")) pk.add(singleCol.get(0));
+        }
+        else {
+            fk.add(singleCol.get(0));
+            singleCol.add("FOREIGN KEY");
+        }
         return singleCol;
     }
     // private boolean parseSelectList() {
@@ -84,7 +164,6 @@ class SQLParser {
         } else{
             position = currPos;
             if (parseColumn()) {
-                System.out.println("else if called" + input.substring(position, position+10));
                 return true;
             }
         }
@@ -94,7 +173,6 @@ class SQLParser {
     private boolean parseColumn() {
         int currPos = position;
         if (parseTableName() && match(".") && parseColumnName()) {
-            System.out.println("oho");
             return true;
         } else{
             position = currPos;
@@ -107,7 +185,6 @@ class SQLParser {
     }
     
     private boolean parseTableList() {
-        System.out.println("called");
         int currPos = position;
         if (parseTableName() && match(",") && parseTableList()) {
             return true;
@@ -122,10 +199,8 @@ class SQLParser {
     
     private boolean parseWhereClause() {
         if (match("WHERE") && parseCondition()) {
-            System.out.println("where matched");
             return true;
         } else {
-            System.out.println("where not matched");
            return false;
         }
     }
@@ -322,10 +397,6 @@ class SQLParser {
         return true;
     }
 
-    private boolean parseInsertInto() {
-        return match("INSERT") && match("INTO") && parseTableName() && match("(") && parseSelectList() && match(")") && match("VALUES") && match("(") && parseValueList() && match(")");
-    }
-
     private boolean parseValueList() {
         if (parseLiteral()) {
             skipSpaces();
@@ -344,7 +415,7 @@ class SQLParser {
         if (position + expected.length() <= input.length() &&
             input.substring(position, position + expected.length()).equals(expected)) {
             position += expected.length();
-            System.out.println("success" + expected);
+            // System.out.println("success" + expected);
             return true;
         }
         // System.out.println("match func failed " + expected + input.substring(position, position+expected.length() ));
@@ -361,8 +432,7 @@ class SQLParser {
             // System.out.println("success matching id.");
             return true;
         }
-        // System.out.println(input.substring(position, position+10));
-        System.out.println("failed matching id." + position);
+        // System.out.println("failed matching id." + position);
         return false;
     }
     
@@ -372,10 +442,8 @@ class SQLParser {
             while (position < input.length() && (Character.isDigit(input.charAt(position)) || input.charAt(position) == '.')) {
                 position++;
             }
-            System.out.println("success matching no.");
             return true;
         }
-        System.out.println("failed matching no.");
         return false;
     }
     private void skipSpaces(){
@@ -386,41 +454,34 @@ class SQLParser {
     public class SQLParserExample {
         public static void main(String[] args) {
             
-            String sql = "SELECT customers.name, orders.order_date, order_items.quantity " +
+            String select = "SELECT customers.name, orders.order_date, order_items.quantity " +
                          "FROM customers " +
                          "INNER JOIN orders ON customers.id = orders.customer_id " +
                          "INNER JOIN order_items ON orders.id = order_items.order_id " +
                          "WHERE customers.country = 'USA' " +
                          "GROUP BY customers.name, orders.order_date " +
-                         "HAVING SUM(order_items.quantity) > 10";
+                         "HAVING SUM(order_items.quantity) > 10;";
 
-            String sql2 = "CREATE TABLE customers (" +
+            String create = "CREATE TABLE customers (" +
                 "id INT PRIMARY KEY," +
                 "name VARCHAR(50) NOT NULL," +
                 "email VARCHAR(100) UNIQUE," +
                 "personID INT FOREIGN KEY REFERENCES Persons(PersonID)," +
-                "address TEXT)"; 
+                "address TEXT);"; 
             
-            String sql3 = "INSERT INTO customers (name, email, id, address)" + 
-            " VALUES ('John Doe', 'john@example.com', 1, '123 Main St')";
-            
-            SQLParser parser = new SQLParser(sql2);
-            boolean success = parser.parse();
-            
+            String insert = "INSERT INTO customers (name, email, id, address)" + 
+            " VALUES ('John Doe', 'john@example.com', 1, '123 Main St');";
+
+            String drop = "DROP TABLE customers;";
+            SQLParser parser = new SQLParser(select+ create +insert+drop);
+            boolean success = parser.parseAll();
             if (success) {
-                // List<String> tables = parser.getTables();
-                // List<String> columns = parser.getColumns();
-                // List<String> primaryKeys = parser.getPrimaryKeys();
-                // Map<String, List<String>> foreignKeys = parser.getForeignKeys();
-                // List<Join> joins = parser.getJoins();
-                
                 System.out.println("Tables: " + parser.tables);
                 System.out.println("Columns: " + parser.columns);
-                // System.out.println("Primary keys: " + primaryKeys);
-                // System.out.println("Foreign keys: " + foreignKeys);
-                // System.out.println("Joins: " + joins);
+                System.out.println("Primary keys: " + parser.pks);
+                System.out.println("Foreign keys: " + parser.sks);
             } else {
-                System.out.println("Parsing failed");
+                System.out.println("Parsing failed. Please check for sytax errors.");
             }
         }
     }
