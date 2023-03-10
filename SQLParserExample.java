@@ -1,18 +1,37 @@
+import java.util.*;
 class SQLParser {
     private String input;
     private int position;
+    public ArrayList<String> tables = new ArrayList<> ();
+    public HashMap<String, ArrayList<List<String>>> columns = new HashMap<>();
+    public HashMap<String, List<String>> pks = new HashMap<>();
+    public HashMap<String, List<String>> sks = new HashMap<>();
     
     public SQLParser(String input) {
         this.input = input;
         this.position = 0;
-        // this.tables = new ArrayList<>();
-        // this.columns = new ArrayList<>();
-        // this.primaryKeys = new ArrayList<>();
-        // this.foreignKeys = new HashMap<>();
-        // this.joins = new ArrayList<>();
     }
     public boolean parse(){ 
-        return parseSelectStatement() || parseCreateTable();
+        if(parseSelectStatement()) return true;
+        position=0;
+        if(parseCreateTable()){
+            position=0;
+            match("CREATE");
+            match("TABLE");
+            skipSpaces();
+            int startInd = position;
+            parseTableName();
+            int endInd = position;
+            tables.add(input.substring(startInd,endInd));
+            match("(");
+            StoreColumns(input.substring(startInd,endInd));
+            return true;
+        }
+        position=0;
+        if(parseInsertInto()){
+            return true;
+        }
+        return false;
     }
     
     public boolean parseSelectStatement() {
@@ -20,11 +39,36 @@ class SQLParser {
             parseWhereClause() && parseGroupByClause() && parseHavingClause()) {
             return true;
         }
-        position=0;
         return false;
     }
     private boolean parseCreateTable() {
         return match("CREATE") && match("TABLE") && parseTableName() && match("(") && parseColumnDefList() && match(")");
+    }
+    private void StoreColumns(String tableName){
+        ArrayList<List<String>> cols = new ArrayList<>();
+        cols.add(findColumn());
+        while (match(",")){
+            cols.add(findColumn());
+        }
+        columns.put(tableName,cols);
+    }
+
+    private List<String> findColumn(){
+        List<String> singleCol = new ArrayList<>();
+        skipSpaces();
+        int startInd = position;
+        parseColumnName();
+        int endInd = position;
+        singleCol.add(input.substring(startInd,endInd));
+        parseDataType();
+        singleCol.add(input.substring(endInd,position));
+        endInd= position;
+        skipSpaces();
+        parseColumnConstraints();
+        if(position-endInd<1) singleCol.add("no constraint provided");
+        else if(position-endInd <=12)singleCol.add(input.substring(endInd,position));
+        else singleCol.add(input.substring(endInd,endInd+12));
+        return singleCol;
     }
     // private boolean parseSelectList() {
     //     if (parseSelectList()) {
@@ -109,7 +153,7 @@ class SQLParser {
     }
     
     private boolean parseComparison() {
-        if (parseValue() && parseOperator() && parseValue()) {
+        if (parseColumn() && parseOperator() && parseValue()) {
             return true;
         }
         return false;
@@ -130,7 +174,7 @@ class SQLParser {
     }
     
     private boolean parseLiteral() {
-        if (match("'") && matchIdentifier() && match("'")) {
+        if (match("'") && matchString() && match("'")) {
             return true;
         } else if (matchNumber()) {
             return true;
@@ -138,6 +182,16 @@ class SQLParser {
         return false;
     }
     
+    private boolean matchString(){
+        if(position < input.length() && input.charAt(position) >=32 && input.charAt(position) <127){
+            while(position < input.length() && input.charAt(position) !=39 && input.charAt(position) >=32 && input.charAt(position) <127){
+                position++;
+            }
+            return true;
+        }
+        return false;
+        
+    }
     private boolean parseGroupByClause() {
         if (match("GROUP BY") && parseSelectList()) {
             return true;
@@ -235,7 +289,7 @@ class SQLParser {
         skipSpaces();
         return matchIdentifier() && parseDataType() && parseColumnConstraints();
     }
-    
+
     private boolean parseDataType() {
         skipSpaces();
         return match("INT") || (match("VARCHAR(") && matchNumber() && match(")")) || match("TEXT");
@@ -252,11 +306,41 @@ class SQLParser {
         if (match("UNIQUE")) {
             return true;
         }
+        if (match("FOREIGN KEY")) {
+            boolean once = false;
+            while(input.charAt(position)!= ','){
+                if(input.charAt(position) == ')'){
+                    if(once) {
+                        break;
+                    }
+                    once= true;
+                }
+                position++;
+            }
+            return true;
+        }
         return true;
     }
-    
+
+    private boolean parseInsertInto() {
+        return match("INSERT") && match("INTO") && parseTableName() && match("(") && parseSelectList() && match(")") && match("VALUES") && match("(") && parseValueList() && match(")");
+    }
+
+    private boolean parseValueList() {
+        if (parseLiteral()) {
+            skipSpaces();
+            while (match(",")) {
+                if (!parseLiteral()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
     private boolean match(String expected) {
-        while(position < input.length() && input.charAt(position) == ' ') position++ ;
+        skipSpaces();
         if (position + expected.length() <= input.length() &&
             input.substring(position, position + expected.length()).equals(expected)) {
             position += expected.length();
@@ -268,7 +352,7 @@ class SQLParser {
     }
     
     private boolean matchIdentifier() {
-        while(position < input.length() && input.charAt(position) == ' ') position++ ;
+        skipSpaces();
         if (position < input.length() && Character.isLetter(input.charAt(position))) {
             position++;
             while (position < input.length() && (Character.isLetterOrDigit(input.charAt(position)) || input.charAt(position) == '_')) {
@@ -277,7 +361,7 @@ class SQLParser {
             // System.out.println("success matching id.");
             return true;
         }
-        System.out.println(input.substring(position, position+10));
+        // System.out.println(input.substring(position, position+10));
         System.out.println("failed matching id." + position);
         return false;
     }
@@ -314,7 +398,12 @@ class SQLParser {
                 "id INT PRIMARY KEY," +
                 "name VARCHAR(50) NOT NULL," +
                 "email VARCHAR(100) UNIQUE," +
+                "personID INT FOREIGN KEY REFERENCES Persons(PersonID)," +
                 "address TEXT)"; 
+            
+            String sql3 = "INSERT INTO customers (name, email, id, address)" + 
+            " VALUES ('John Doe', 'john@example.com', 1, '123 Main St')";
+            
             SQLParser parser = new SQLParser(sql2);
             boolean success = parser.parse();
             
@@ -325,8 +414,8 @@ class SQLParser {
                 // Map<String, List<String>> foreignKeys = parser.getForeignKeys();
                 // List<Join> joins = parser.getJoins();
                 
-                // System.out.println("Tables: " + tables);
-                // System.out.println("Columns: " + columns);
+                System.out.println("Tables: " + parser.tables);
+                System.out.println("Columns: " + parser.columns);
                 // System.out.println("Primary keys: " + primaryKeys);
                 // System.out.println("Foreign keys: " + foreignKeys);
                 // System.out.println("Joins: " + joins);
