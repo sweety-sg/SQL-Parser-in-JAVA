@@ -1,4 +1,7 @@
+import java.nio.file.Files;
 import java.util.*;
+import java.nio.file.Paths;
+
 class SQLParser {
     private String input;
     private int position;
@@ -205,15 +208,6 @@ class SQLParser {
         }
     }
 
-    private boolean parseAggregateFunction() {
-        if (match("SUM") || match("AVG") || match("MIN") || match("MAX") || match("COUNT")) {
-            if (match("(") && parseColumn() && match(")")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private boolean parseCondition() {
         if (parseComparison()) {
             return true;
@@ -277,6 +271,14 @@ class SQLParser {
     private boolean parseHavingClause() {
         if (match("HAVING") && parseAggregateFunction() && parseOperator() && parseLiteral()) {
             return true;
+        }
+        return false;
+    }
+    private boolean parseAggregateFunction() {
+        if (match("SUM") || match("AVG") || match("MIN") || match("MAX") || match("COUNT")) {
+            if (match("(") && parseColumn() && match(")")) {
+                return true;
+            }
         }
         return false;
     }
@@ -429,10 +431,8 @@ class SQLParser {
             while (position < input.length() && (Character.isLetterOrDigit(input.charAt(position)) || input.charAt(position) == '_')) {
                 position++;
             }
-            // System.out.println("success matching id.");
             return true;
         }
-        // System.out.println("failed matching id." + position);
         return false;
     }
     
@@ -473,16 +473,17 @@ class SQLParser {
             " VALUES ('John Doe', 'john@example.com', 1, '123 Main St');";
 
             String drop = "DROP TABLE customers;";
-            SQLParser parser = new SQLParser(select+ create +insert+drop);
-            boolean success = parser.parseAll();
-            if (success) {
-                System.out.println("Tables: " + parser.tables);
-                System.out.println("Columns: " + parser.columns);
-                System.out.println("Primary keys: " + parser.pks);
-                System.out.println("Foreign keys: " + parser.sks);
-            } else {
-                System.out.println("Parsing failed. Please check for sytax errors.");
-            }
+            // SQLParser parser = new SQLParser(test);
+            // boolean success = parser.parseAll();
+            // if (success) {
+            //     System.out.println("No syntax/lexical errors found");
+            //     System.out.println("Tables: " + parser.tables);
+            //     System.out.println("Columns: " + parser.columns);
+            //     System.out.println("Primary keys: " + parser.pks);
+            //     System.out.println("Foreign keys: " + parser.sks);
+            // } else {
+            //     System.out.println("Parsing failed. Please check for sytax errors.");
+            // }
         }
     }
 
