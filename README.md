@@ -38,7 +38,7 @@ java -version
 
 ## Clone the Project
 
-Clone the project from the following github link into your system using command
+Clone the project from the following github link into your system.
 
 ```sh
 git clone https://github.com/sweety-sg/SQL-Parser-in-JAVA
@@ -47,23 +47,26 @@ git clone https://github.com/sweety-sg/SQL-Parser-in-JAVA
 
 ## Compiling the Parser
 
-Open the directory where you have cloned the repository and run following commands
+Open the directory where you have cloned the repository and run following commands:
 
-1. To compile the PARSER
+Compile the PARSER
 ```console
 javac SQLParserExample.java
 ```
-2. To compile the Test Cases
-```console
-javac SQLParserTest.java
-```
+
 ## Running Test Cases
 
 In the test file, `SQLParser parser = new SQLParser(TC)`; creats an instance of a SQLParser object, which is used for parsing SQL statements. The constructor for this object takes a single argument, which is a string representing the SQL statement to be parsed. Once you have created the SQLParser object, you can use its methods to parse the SQL statement and extract information from it. 
 
 Here `TC` is a string variable test case (SQL query). We have provided ten different test cases (named TC1, TC2...TC10).
 
-To run the file, use following command:
+Compile the Test Cases file
+
+```console
+javac SQLParserTest.java
+```
+
+Run the file
 
 ```console
 java SQLParserTest
