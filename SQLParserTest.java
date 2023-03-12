@@ -52,7 +52,7 @@ public class SQLParserTest extends SQLParserExample{
                 "address TEXT);" +
                 "INSERT INTO customers (name, email, id, address)" + 
                 " VALUES ('John Doe', 'john@example.com', 1,  '123 Main St');";
-                
+
         String TC8 = TC7 + "DROP TABLE customers;";
 
         String TC9 = "CREATE TABLE customers (" +
@@ -75,8 +75,17 @@ public class SQLParserTest extends SQLParserExample{
         "address TEXT);" +
         "INSERT INTO customers (xyz, email,id ,address)" + 
         " VALUES ('John Doe', 'john@example.com',1, '123 Main St');";
+
+        String TC11 = "CREATE DATABASE db;";
+
+        String TC12 = "CREATE TABLE 1customers (" +
+                "id INT PRIMARY KEY," +
+                "name VARCHAR(50) NOT NULL," +
+                "email VARCHAR(100) UNIQUE," +
+                "personID INT FOREIGN KEY REFERENCES Persons(PersonID)," +
+                "address TEXT);"; 
                     
-        SQLParser parser = new SQLParser(TC10);
+        SQLParser parser = new SQLParser(TC9);
 
         boolean success = parser.parseAll();
 

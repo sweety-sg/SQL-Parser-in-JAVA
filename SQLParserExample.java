@@ -26,7 +26,23 @@ class SQLParser {
         return isValid;
     }
     public boolean parse(){ 
-        if(parseSelectStatement()) return true;
+        if(createDatabase()) return true;
+        position=0;
+        if(parseSelectStatement()){
+            position=0;
+            match("SELECT");
+            if(!match("*")) parseSelectList();
+            match("FROM");
+            int start = position;
+            parseTableName();
+            String name = input.substring(start, position).trim();
+            if(!tables.contains(name)){
+                System.out.println("There is no such table");
+                return false;
+            }
+            
+            return true;
+        }
         position=0;
         if(parseCreateTable()){
             position=0;
@@ -96,7 +112,7 @@ class SQLParser {
     }
     
     public boolean parseSelectStatement() {
-        if (match("SELECT") && parseSelectList() && match("FROM") && parseTableList() && parseJoin() &&
+        if (match("SELECT") && (parseSelectList() || match("*")) && match("FROM") && parseTableList() && parseJoin() &&
             parseWhereClause() && parseGroupByClause() && parseHavingClause()) {
             return true;
         }
@@ -111,6 +127,9 @@ class SQLParser {
     }
     private boolean parseDropTable() {
         return match("DROP") && match("TABLE") && parseTableName();
+    }
+    private boolean createDatabase() {
+        return match("CREATE") && match("DATABASE") && matchIdentifier();
     }
 
     private void StoreColumns(String tableName){
@@ -153,12 +172,7 @@ class SQLParser {
         }
         return singleCol;
     }
-    // private boolean parseSelectList() {
-    //     if (parseSelectList()) {
-    //         return true;
-    //     }
-    //     return false;
-    // }
+
 
     private boolean parseSelectList() {
         int currPos = position;
@@ -180,7 +194,6 @@ class SQLParser {
         } else{
             position = currPos;
             if (parseColumnName()) {
-                // System.out.println(input.substring(position, position+10));
                 return true;
             }
         }
@@ -473,17 +486,6 @@ class SQLParser {
             " VALUES ('John Doe', 'john@example.com', 1, '123 Main St');";
 
             String drop = "DROP TABLE customers;";
-            // SQLParser parser = new SQLParser(test);
-            // boolean success = parser.parseAll();
-            // if (success) {
-            //     System.out.println("No syntax/lexical errors found");
-            //     System.out.println("Tables: " + parser.tables);
-            //     System.out.println("Columns: " + parser.columns);
-            //     System.out.println("Primary keys: " + parser.pks);
-            //     System.out.println("Foreign keys: " + parser.sks);
-            // } else {
-            //     System.out.println("Parsing failed. Please check for sytax errors.");
-            // }
         }
     }
 
