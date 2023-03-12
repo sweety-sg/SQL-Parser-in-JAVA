@@ -62,9 +62,15 @@ Here `TC` is a string variable test case (SQL query). We have provided ten diffe
 
 Compile the Test Cases file
 
+```
+To test a string , create a SQL parser object for the string in the SQLParserTest file -
+SQLParser parser = new SQLParser(str);
+```
+
 ```console
 javac SQLParserTest.java
 ```
+
 
 Run the file
 
